@@ -1,4 +1,4 @@
 # random-projekty
 Prostě moje random projekty, pro Python, Arduino atd.
 
-Kód psán mnou, pár kousků psalo AI
+"Kódy psané mnou" znamenají že jsem alespoň většinu napsal sám a pak jsem to dal AI maximálně na dopilování
