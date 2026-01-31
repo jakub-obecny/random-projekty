@@ -1,7 +1,7 @@
 # random-projekty
 Prostě moje random projekty, pro Python, Arduino atd.
 
-!!!VAROVÁNÍ!!! Arduino kód jsem testoval pouze na Arduino Nano EPS32, neboli nezaručuji funkčnost na vaší desce.
+!!!VAROVÁNÍ!!! Arduino kód jsem testoval pouze na *Arduino Nano EPS32*, neboli nezaručuji funkčnost na vaší desce.
 
 -Info:
 1) "Kódy psané ručně" jsou kódy které jsem alespoň většinu napsal sám a pak jsem to dal AI maximálně na dopilování (případné poznámky v kódu jsou psané pomocí AI)
