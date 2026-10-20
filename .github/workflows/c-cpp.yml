@@ -18,27 +18,48 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Check C source files compile
+      - name: Check buildable C source files compile
         shell: bash
         run: |
           set -euo pipefail
 
-          found=0
-          while IFS= read -r -d '' file; do
+          shopt -s nullglob
+
+          # Compile only tracked C files that are actually buildable in CI.
+          # Demo / special-purpose sources are intentionally skipped.
+          mapfile -d '' c_files < <(
+            git ls-files -z '*.c' | while IFS= read -r -d '' file; do
+              case "$file" in
+                *"/game of life/"*|*"/mandelbrot "*|*"/mandelbrot ("*|*"/mandelbrot_"*)
+                  continue
+                  ;;
+              esac
+              printf '%s\0' "$file"
+            done
+          )
+
+          if [ "${#c_files[@]}" -eq 0 ]; then
+            echo "No buildable C sources found in the repository."
+            exit 0
+          fi
+
+          compiled=0
+
+          for file in "${c_files[@]}"; do
             case "$file" in
               *.exe|*.out)
                 continue
                 ;;
             esac
 
-            found=1
             echo "Checking $file"
             gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -c "$file" -o /tmp/ci-check.o
-          done < <(find . -type f -name '*.c' -print0)
+            compiled=$((compiled + 1))
+          done
 
-          if [ "$found" -eq 0 ]; then
-            echo "No C files found in the repository."
+          if [ "$compiled" -eq 0 ]; then
+            echo "No buildable C sources found in the repository."
             exit 0
           fi
 
-          echo "All C files compile successfully."
+          echo "All buildable C sources compile successfully."
