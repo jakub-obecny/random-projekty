@@ -1,5 +1,5 @@
 /*
- * Mandelbrot -> JPEG (baseline, 4:4:4), bez externích knihoven.
+ * Mandelbrot -> JPEG (baseline, 4:4:4), BEZ EXTERNÍCH KNIHOVEN.
  * Počítá se na všech jádrech (OpenMP) a JPEG se zapisuje průběžně,
  * takže se celý obrázek nikdy nedrží v paměti.
  *
