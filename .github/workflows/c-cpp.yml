@@ -41,7 +41,6 @@ jobs:
                 ;;
             esac
 
-            # Ignore files that are clearly not executables
             if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
               echo "Skipping $file (no main function)"
               continue
@@ -52,7 +51,7 @@ jobs:
 
             echo "Compiling $rel -> $out"
             mkdir -p "$(dirname "$out")"
-            gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 "$file" -o "$out"
+            gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -fopenmp "$file" -lm -o "$out"
             built=$((built + 1))
           done < <(find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0)
 
