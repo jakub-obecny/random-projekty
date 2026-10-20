@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 /* --- KONFIGURACE --- */
-#define WIDTH    23000
-#define HEIGHT   23000
+#define WIDTH    15000
+#define HEIGHT   15000
 #define MAX_ITER 100
 #define FILENAME "mandelbrot.bmp"
 #define BATCH    64   /* kolik řádků se počítá paralelně najednou */
