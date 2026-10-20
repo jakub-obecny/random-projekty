@@ -18,48 +18,40 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Check buildable C source files compile
+      - name: Build all C executables
         shell: bash
         run: |
           set -euo pipefail
 
+          mkdir -p build
           shopt -s nullglob
-
-          # Compile only tracked C files that are actually buildable in CI.
-          # Demo / special-purpose sources are intentionally skipped.
-          mapfile -d '' c_files < <(
-            git ls-files -z '*.c' | while IFS= read -r -d '' file; do
-              case "$file" in
-                *"/game of life/"*|*"/mandelbrot "*|*"/mandelbrot ("*|*"/mandelbrot_"*)
-                  continue
-                  ;;
-              esac
-              printf '%s\0' "$file"
-            done
-          )
-
-          if [ "${#c_files[@]}" -eq 0 ]; then
-            echo "No buildable C sources found in the repository."
-            exit 0
-          fi
 
           compiled=0
 
-          for file in "${c_files[@]}"; do
+          while IFS= read -r file; do
             case "$file" in
-              *.exe|*.out)
+              *.exe|*.out|*/build/*)
                 continue
                 ;;
             esac
 
-            echo "Checking $file"
-            gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -c "$file" -o /tmp/ci-check.o
+            if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
+              echo "Skipping $file (no main function)"
+              continue
+            fi
+
+            safe_name=$(printf '%s' "$file" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//')
+            out="build/${safe_name%.*}.exe"
+
+            echo "Compiling $file -> $out"
+            gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 "$file" -o "$out"
             compiled=$((compiled + 1))
-          done
+          done < <(git ls-files '*.c')
 
           if [ "$compiled" -eq 0 ]; then
-            echo "No buildable C sources found in the repository."
+            echo "No C programs with main() found in the repository."
             exit 0
           fi
 
-          echo "All buildable C sources compile successfully."
+          echo "Built $compiled C executable(s) successfully."
+          ls -1 build
