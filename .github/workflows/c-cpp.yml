@@ -1,44 +1,35 @@
-name: C/C++ CI
+- name: Install MinGW
+  shell: bash
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y mingw-w64
 
-on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
+- name: Build Windows EXEs with MinGW
+  shell: bash
+  run: |
+    set -euo pipefail
+    mkdir -p build-win
 
-jobs:
-  build-windows:
-    runs-on: windows-latest
+    find . -type f -name '*.c' ! -path './.git/*' ! -path './build*' -print0 |
+    while IFS= read -r -d '' file; do
+      case "$file" in
+        *.exe|*.out|./build*|*/build/*)
+          continue
+          ;;
+      esac
 
-    steps:
-      - uses: actions/checkout@v4
+      if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
+        echo "Skipping $file (no main)"
+        continue
+      fi
 
-      - name: Build all C files to Windows EXEs
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build
+      rel="${file#./}"
+      out="build-win/$(printf '%s' "$rel" | sed -E 's/[\\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
 
-          find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0 |
-          while IFS= read -r -d '' file; do
-            case "$file" in
-              *.exe|*.out|./build/*)
-                continue
-                ;;
-            esac
+      echo "Compiling $rel -> $out"
+      mkdir -p "$(dirname "$out")"
+      x86_64-w64-mingw32-gcc -O2 -std=c11 "$file" -o "$out"
+    done
 
-            if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
-              echo "Skipping $file (no main)"
-              continue
-            fi
-
-            rel="${file#./}"
-            out="build/$(printf '%s' "$rel" | sed -E 's/[\\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
-
-            echo "Compiling $rel -> $out"
-            mkdir -p "$(dirname "$out")"
-            gcc -Wall -Wextra -std=c11 "$file" -o "$out"
-          done
-
-          echo "Generated files:"
-          find build -type f -name '*.exe' -printf '%P\n' | sort
+    echo "Built:"
+    find build-win -type f -name '*.exe' | sort
