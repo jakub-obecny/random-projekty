@@ -6,36 +6,20 @@ on:
   pull_request:
     branches: ["main"]
 
-permissions:
-  contents: write
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-windows:
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Install build tools
+      - name: Build all C files to Windows EXEs
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-
-      - name: Build all C programs individually
-        shell: bash
-        run: |
-          set -uo pipefail
-
+          set -euo pipefail
           mkdir -p build
-          shopt -s nullglob
 
-          built=0
-          failed=0
-          skipped=0
-
+          find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0 |
           while IFS= read -r -d '' file; do
             case "$file" in
               *.exe|*.out|./build/*)
@@ -44,64 +28,17 @@ jobs:
             esac
 
             if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
-              echo "Skipping $file (no main function)"
-              skipped=$((skipped + 1))
+              echo "Skipping $file (no main)"
               continue
             fi
 
             rel="${file#./}"
-            out="build/$(printf '%s' "$rel" | sed -E 's/[\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
+            out="build/$(printf '%s' "$rel" | sed -E 's/[\\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
 
             echo "Compiling $rel -> $out"
             mkdir -p "$(dirname "$out")"
+            gcc -Wall -Wextra -std=c11 "$file" -o "$out"
+          done
 
-            compile_log="$(mktemp)"
-            if gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -fopenmp "$file" -lm -o "$out" >"$compile_log" 2>&1; then
-              built=$((built + 1))
-            else
-              failed=$((failed + 1))
-              echo "::warning::Compilation failed for $rel"
-              cat "$compile_log"
-            fi
-            rm -f "$compile_log"
-          done < <(find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0)
-
-          echo
-          echo "Summary:"
-          echo "  built:    $built"
-          echo "  failed:   $failed"
-          echo "  skipped:  $skipped"
-
-          if [ "$built" -eq 0 ]; then
-            echo "No C programs were successfully compiled."
-            exit 0
-          fi
-
-          echo "Successfully built $built executable(s)."
+          echo "Generated files:"
           find build -type f -name '*.exe' -printf '%P\n' | sort
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: c-builds
-          path: build/**/*.exe
-          if-no-files-found: warn
-
-      - name: Commit generated .exe files to repo
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add build
-
-          if git diff --cached --quiet; then
-            echo "No generated .exe files changed."
-            exit 0
-          fi
-
-          git commit -m "chore: build C executables [skip ci]"
-          git push origin HEAD:main
