@@ -19,6 +19,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install build tools
+        shell: bash
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
@@ -31,6 +32,8 @@ jobs:
           mkdir -p build
           shopt -s nullglob
 
+          built=0
+
           while IFS= read -r -d '' file; do
             case "$file" in
               *.exe|*.out|./build/*)
@@ -38,12 +41,7 @@ jobs:
                 ;;
             esac
 
-            case "$file" in
-              *"/game of life/"*|*"/mandelbrot "*|*"/mandelbrot ("*|*"/mandelbrot_"*)
-                continue
-                ;;
-            esac
-
+            # Ignore files that are clearly not executables
             if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
               echo "Skipping $file (no main function)"
               continue
@@ -52,15 +50,42 @@ jobs:
             rel="${file#./}"
             out="build/$(printf '%s' "$rel" | sed -E 's/[\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
 
-            mkdir -p "$(dirname "$out")"
             echo "Compiling $rel -> $out"
+            mkdir -p "$(dirname "$out")"
             gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 "$file" -o "$out"
+            built=$((built + 1))
           done < <(find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0)
 
-          if [ -z "$(find build -type f -name '*.exe' -print -quit)" ]; then
-            echo "No C executables were produced."
+          if [ "$built" -eq 0 ]; then
+            echo "No C programs with main() found."
             exit 0
           fi
 
-          echo "Built executables:"
+          echo "Built $built executable(s):"
           find build -type f -name '*.exe' -printf '%P\n' | sort
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-builds
+          path: build/**/*.exe
+          if-no-files-found: warn
+
+      - name: Commit generated .exe files to repo
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add build
+
+          if git diff --cached --quiet; then
+            echo "No generated .exe files changed."
+            exit 0
+          fi
+
+          git commit -m "chore: build C executables [skip ci]"
+          git push origin HEAD:main
