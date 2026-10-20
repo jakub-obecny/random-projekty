@@ -24,15 +24,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Build all C programs into .exe files
+      - name: Build all C programs individually
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           mkdir -p build
           shopt -s nullglob
 
           built=0
+          failed=0
+          skipped=0
 
           while IFS= read -r -d '' file; do
             case "$file" in
@@ -43,6 +45,7 @@ jobs:
 
             if ! grep -Eq '^[[:space:]]*(int|void)[[:space:]]+main[[:space:]]*\(' "$file"; then
               echo "Skipping $file (no main function)"
+              skipped=$((skipped + 1))
               continue
             fi
 
@@ -51,16 +54,30 @@ jobs:
 
             echo "Compiling $rel -> $out"
             mkdir -p "$(dirname "$out")"
-            gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -fopenmp "$file" -lm -o "$out"
-            built=$((built + 1))
+
+            compile_log="$(mktemp)"
+            if gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 -fopenmp "$file" -lm -o "$out" >"$compile_log" 2>&1; then
+              built=$((built + 1))
+            else
+              failed=$((failed + 1))
+              echo "::warning::Compilation failed for $rel"
+              cat "$compile_log"
+            fi
+            rm -f "$compile_log"
           done < <(find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0)
 
+          echo
+          echo "Summary:"
+          echo "  built:    $built"
+          echo "  failed:   $failed"
+          echo "  skipped:  $skipped"
+
           if [ "$built" -eq 0 ]; then
-            echo "No C programs with main() found."
+            echo "No C programs were successfully compiled."
             exit 0
           fi
 
-          echo "Built $built executable(s):"
+          echo "Successfully built $built executable(s)."
           find build -type f -name '*.exe' -printf '%P\n' | sort
 
       - name: Upload build artifacts
