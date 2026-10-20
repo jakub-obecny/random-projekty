@@ -6,19 +6,24 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install build tools
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
 
-      - name: Build all C executables
+      - name: Build all C programs into .exe files
         shell: bash
         run: |
           set -euo pipefail
@@ -26,11 +31,15 @@ jobs:
           mkdir -p build
           shopt -s nullglob
 
-          compiled=0
-
-          while IFS= read -r file; do
+          while IFS= read -r -d '' file; do
             case "$file" in
-              *.exe|*.out|*/build/*)
+              *.exe|*.out|./build/*)
+                continue
+                ;;
+            esac
+
+            case "$file" in
+              *"/game of life/"*|*"/mandelbrot "*|*"/mandelbrot ("*|*"/mandelbrot_"*)
                 continue
                 ;;
             esac
@@ -40,18 +49,18 @@ jobs:
               continue
             fi
 
-            safe_name=$(printf '%s' "$file" | sed -E 's/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//')
-            out="build/${safe_name%.*}.exe"
+            rel="${file#./}"
+            out="build/$(printf '%s' "$rel" | sed -E 's/[\/]+/_/g; s/[^A-Za-z0-9._-]+/_/g; s/^_+//; s/_+$//').exe"
 
-            echo "Compiling $file -> $out"
+            mkdir -p "$(dirname "$out")"
+            echo "Compiling $rel -> $out"
             gcc -Wall -Wextra -Wno-unknown-pragmas -Wno-ignored-pragmas -std=c11 "$file" -o "$out"
-            compiled=$((compiled + 1))
-          done < <(git ls-files '*.c')
+          done < <(find . -type f -name '*.c' ! -path './.git/*' ! -path './build/*' -print0)
 
-          if [ "$compiled" -eq 0 ]; then
-            echo "No C programs with main() found in the repository."
+          if [ -z "$(find build -type f -name '*.exe' -print -quit)" ]; then
+            echo "No C executables were produced."
             exit 0
           fi
 
-          echo "Built $compiled C executable(s) successfully."
-          ls -1 build
+          echo "Built executables:"
+          find build -type f -name '*.exe' -printf '%P\n' | sort
