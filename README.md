@@ -9,6 +9,4 @@ Prostě moje random projekty, pro Python, Arduino atd.
 2) "Kódy psané pomocí AI" jsou kódy které, jak z názvu vyplívá, kompletně psané pomocí AI, většinou pomocí Claude
 
 
-<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/275350f4-94eb-418c-9a31-99c76f72a3eb" />
-
 <img width="1024" height="1536" alt="ChatGPT Image 15  2  2026 14_42_07" src="https://github.com/user-attachments/assets/cfd52b93-e803-4087-8edf-7625dc4609db" />
