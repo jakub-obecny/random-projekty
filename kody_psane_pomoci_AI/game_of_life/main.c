@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <stdbool.h>
 #include <string.h>
 #include <time.h>
 
@@ -62,8 +61,35 @@ static void write_u32(FILE *f, uint32_t v) {
 
 static int glyph_index_for_char(char ch) {
     char *p = strchr(FONT_CHARS, ch);
-    if (!p) return 24; /* mezera */
+    if (!p) return 24;
     return (int)(p - FONT_CHARS);
+}
+
+static int read_int(const char *prompt, int min_value) {
+    char buffer[128];
+    char *end = NULL;
+    long value = 0;
+
+    while (1) {
+        printf("%s", prompt);
+        if (!fgets(buffer, sizeof(buffer), stdin)) {
+            fprintf(stderr, "Chyba cteni vstupu.\n");
+            exit(1);
+        }
+
+        value = strtol(buffer, &end, 10);
+        if (end == buffer || (*end != '\n' && *end != '\r' && *end != '\0')) {
+            printf("Neplatny vstup. Zadej cele cislo.\n");
+            continue;
+        }
+
+        if (value < min_value) {
+            printf("Hodnota musi byt >= %d.\n", min_value);
+            continue;
+        }
+
+        return (int)value;
+    }
 }
 
 static void init_grid(Grid *g, int w, int h) {
@@ -75,14 +101,17 @@ static void init_grid(Grid *g, int w, int h) {
     g->xr = (int *)malloc((size_t)w * sizeof(int));
     g->yu = (int *)malloc((size_t)h * sizeof(int));
     g->yd = (int *)malloc((size_t)h * sizeof(int));
+
     if (!g->a || !g->b || !g->xl || !g->xr || !g->yu || !g->yd) {
-        fprintf(stderr, "Out of memory\n");
+        fprintf(stderr, "Nedostatek pameti.\n");
         exit(1);
     }
+
     for (int x = 0; x < w; ++x) {
         g->xl[x] = (x - 1 + w) % w;
         g->xr[x] = (x + 1) % w;
     }
+
     for (int y = 0; y < h; ++y) {
         g->yu[y] = (y - 1 + h) % h;
         g->yd[y] = (y + 1) % h;
@@ -168,7 +197,6 @@ static void draw_text_to_bitmap(uint8_t *img, int row_stride, int width, int hei
 
     for (const char *p = txt; *p; ++p) {
         int idx = glyph_index_for_char(*p);
-        int pattern_row = 0;
 
         for (int row = 0; row < 7; ++row) {
             int pattern = gl[idx * 7 + row];
@@ -186,25 +214,24 @@ static void draw_text_to_bitmap(uint8_t *img, int row_stride, int width, int hei
             }
         }
 
-        x += 18; /* 5x3 + mezera */
+        x += 18;
     }
 }
 
 static void save_bmp(const char *filename, const Grid *g, int gen, const char *txt) {
     int cell_size = 8;
     int img_w = g->w * cell_size;
-    int img_h = g->h * cell_size + 32;  /* prostor pro text */
+    int img_h = g->h * cell_size + 32;
 
-    int row_stride = ((img_w + 31) / 32) * 4; /* 1-bit BMP */
+    int row_stride = ((img_w + 31) / 32) * 4;
     size_t img_size = (size_t)row_stride * (size_t)img_h;
     uint8_t *pixels = (uint8_t *)calloc(1, img_size);
 
     if (!pixels) {
-        fprintf(stderr, "Cannot allocate BMP buffer\n");
+        fprintf(stderr, "Nelze alokovat pamet pro BMP.\n");
         exit(1);
     }
 
-    /* 1 = bíla buňka, 0 = černá */
     for (int y = 0; y < g->h; ++y) {
         for (int x = 0; x < g->w; ++x) {
             if (g->a[y * g->w + x] == 0) continue;
@@ -219,7 +246,6 @@ static void save_bmp(const char *filename, const Grid *g, int gen, const char *t
         }
     }
 
-    /* text ve spodní části */
     draw_text_to_bitmap(pixels, row_stride, img_w, img_h, 8, img_h - 24, txt);
 
     FILE *f = fopen(filename, "wb");
@@ -229,14 +255,12 @@ static void save_bmp(const char *filename, const Grid *g, int gen, const char *t
         exit(1);
     }
 
-    /* BITMAPFILEHEADER */
-    write_u16(f, 0x4D42);  /* "BM" */
+    write_u16(f, 0x4D42);
     write_u32(f, 14u + 40u + 8u + (uint32_t)img_size);
     write_u16(f, 0);
     write_u16(f, 0);
     write_u32(f, 14u + 40u + 8u);
 
-    /* BITMAPINFOHEADER */
     write_u32(f, 40);
     write_u32(f, (uint32_t)img_w);
     write_u32(f, (uint32_t)img_h);
@@ -249,11 +273,9 @@ static void save_bmp(const char *filename, const Grid *g, int gen, const char *t
     write_u32(f, 2);
     write_u32(f, 2);
 
-    /* paleta: 0 = černá, 1 = bílá */
     write_u32(f, 0);
     write_u32(f, 0x00FFFFFF);
 
-    /* zapsat pixely odspodu nahoru */
     for (int y = img_h - 1; y >= 0; --y) {
         size_t row_offset = (size_t)y * row_stride;
         fwrite(pixels + row_offset, 1, (size_t)row_stride, f);
@@ -276,12 +298,12 @@ static void print_ascii(const Grid *g) {
 int main(void) {
     srand((unsigned)time(NULL));
 
+    int generations = read_int("Kolik chces generaci? ", 1);
+    int w = read_int("Sirka pole: ", 1);
+    int h = read_int("Vyska pole: ", 1);
+
     Grid g;
-    int w = 200;
-    int h = 120;
-
     init_grid(&g, w, h);
-
     random_fill(&g);
 
     if (DOSAVE) {
@@ -292,7 +314,7 @@ int main(void) {
         save_bmp("gen(0).bmp", &g, 0, txt);
     }
 
-    for (int gen = 1; gen <= 250; ++gen) {
+    for (int gen = 1; gen <= generations; ++gen) {
         step(&g);
 
         int alive = count_alive(&g);
@@ -309,12 +331,12 @@ int main(void) {
 
         printf("GEN %d: ZIVE %d\n", gen, alive);
 
-        /* Optional: výpis do konzole každých 25 generací */
-        if (gen % 25 == 0) {
+        if (gen % 25 == 0 && (g.w * g.h <= 2500)) {
             print_ascii(&g);
         }
     }
 
+    printf("Hotovo. Vytvoreno %d snapshotu BMP.\\n", generations + 1);
     free_grid(&g);
     return 0;
 }
