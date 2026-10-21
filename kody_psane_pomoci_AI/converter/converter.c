@@ -245,6 +245,22 @@ static int decimal_to_ascii(const char *input, char *output, size_t out_size) {
     return 1;
 }
 
+static void append_value(char *output, size_t out_size, size_t *len, const char *part) {
+    size_t part_len = strlen(part);
+    if (*len + part_len + 1 >= out_size) {
+        return;
+    }
+
+    memcpy(output + *len, part, part_len);
+    *len += part_len;
+
+    if (*len + 1 < out_size) {
+        output[(*len)++] = ' ';
+    }
+
+    output[*len] = '\0';
+}
+
 static int convert_text(const char *input, int in_type, int out_type, char *output, size_t out_size) {
     output[0] = '\0';
 
@@ -260,6 +276,40 @@ static int convert_text(const char *input, int in_type, int out_type, char *outp
         }
         snprintf(output, out_size, "ERROR: INVALID INPUT TYPE");
         return 0;
+    }
+
+    if (in_type == TYPE_ASCII) {
+        size_t len = 0;
+        for (size_t i = 0; input[i] != '\0'; ++i) {
+            unsigned char ch = (unsigned char)input[i];
+            char tmp[64];
+
+            if (out_type == TYPE_BIN) {
+                to_bin8((int)ch, tmp, sizeof(tmp));
+            } else if (out_type == TYPE_HEX) {
+                to_hex2((int)ch, tmp, sizeof(tmp));
+            } else if (out_type == TYPE_DEC) {
+                snprintf(tmp, sizeof(tmp), "%d", (int)ch);
+            } else {
+                snprintf(output, out_size, "ERROR: INVALID OUTPUT TYPE");
+                return 0;
+            }
+
+            append_value(output, out_size, &len, tmp);
+        }
+
+        if (len > 0) {
+            if (len > 0 && output[len - 1] == ' ') {
+                output[len - 1] = '\0';
+            }
+        }
+
+        if (output[0] == '\0') {
+            snprintf(output, out_size, "ERROR: INVALID INPUT");
+            return 0;
+        }
+
+        return 1;
     }
 
     int value = 0;
@@ -279,8 +329,6 @@ static int convert_text(const char *input, int in_type, int out_type, char *outp
             snprintf(output, out_size, "ERROR: INVALID INPUT");
             return 0;
         }
-    } else if (in_type == TYPE_ASCII) {
-        value = (unsigned char)input[0];
     } else {
         snprintf(output, out_size, "ERROR: INVALID INPUT TYPE");
         return 0;
