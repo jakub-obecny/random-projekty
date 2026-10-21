@@ -1,3 +1,5 @@
+/Conway's Game Of Life/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
