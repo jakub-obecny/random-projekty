@@ -481,7 +481,7 @@ int main(void) {
                 continue;
             }
 
-            fprintf(f, "PicoMite Converter\n");
+            fprintf(f, "Converter\n");
             fprintf(f, "Input: %s\n", input);
             fprintf(f, "Result:\n");
             fprintf(f, "%s\n", output);
