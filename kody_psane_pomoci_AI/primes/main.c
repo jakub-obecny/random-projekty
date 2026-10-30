@@ -92,7 +92,7 @@ int main()
 {
     uint8_t column = 0;
 
-    for (uint32_t i = 2; i < 1000; i++)
+    for (uint32_t i = 2; i < 10000; i++)
     {
         if (isprime(i))
         {
